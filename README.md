@@ -11,7 +11,7 @@ The module is a single function but is packaged for convenience.
 
 ### Via PowerShell Gallery
 
-`Install-Module -Name PSLANScan CurrentUser`
+`Install-Module -Name PSLANScan -Scope CurrentUser`
 
 
 ### Via Git

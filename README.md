@@ -29,6 +29,21 @@ Copy the files from `src` to `$Home\Documents\WindowsPowerShell\Modules\PSLANSca
 
 `Find-LANHosts -IP <String[]> [-DelayMS <int>] [-ClearARPCache]`
 
+## Examples
+
+```powershell
+$IPs = 1..254 | % {"192.168.0.$_"}
+Find-LANHosts $IPs
+```
+
+```powershell
+1..254 | % {"192.168.1.$_"} | Find-LANHosts -ClearARPCache
+```
+
+```powershell
+1..254 | % {"10.1.1.$_"} | Find-LANHosts -DelayMS 5
+```
+
 ## More info
 
 See this [blog post](https://xkln.net/blog/layer-2-host-discovery-with-powershell-in-under-a-second/) for further details

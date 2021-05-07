@@ -2,7 +2,7 @@
 
 [![version](https://img.shields.io/badge/version-1.0.2-blue.svg)](https://semver.org)
 
-PSLANScan is a PowerShell module for layer 2 host discovery. It quickly finds live hosts on your network segment given a list of IP addresses, even if the hosts have ICMP/ping blocked by a firewall. 
+PSLANScan is a PowerShell module for layer 2 host discovery via ARP. It quickly finds live hosts on your network segment given a list of IP addresses, even if the hosts have ICMP/ping blocked by a firewall. 
 
 The module is a single function but is packaged for convenience. 
 
@@ -27,9 +27,17 @@ Copy the files from `src` to `$Home\Documents\WindowsPowerShell\Modules\PSLANSca
 
 ## Usage
 
-`Find-LANHosts -IP <String[]> [-DelayMS <int>] [-ClearARPCache]`
+`Find-LANHosts [-IP <String[]>] [-DelayMS <int>] [-ClearARPCache]`
 
 ## Examples
+
+```powershell
+Find-LANHosts
+```
+
+```powershell
+Find-LANHosts -ClearARPCache -DelayMS 5
+```
 
 ```powershell
 $IPs = 1..254 | % {"192.168.0.$_"}

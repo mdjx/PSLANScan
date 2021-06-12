@@ -55,7 +55,7 @@ function Find-LANHosts {
 
         # Determine local network if none specified
         if ($IP.Count -lt 1) {
-            $AssignedIPs = Get-NetAdapter -Physical | Get-NetIPAddress -AddressFamily IPv4 | Select IPAddress, PrefixLength
+            $AssignedIPs = Get-NetAdapter -Physical | ? {$_.Status -eq "up"} | Get-NetIPAddress -AddressFamily IPv4 | Select IPAddress, PrefixLength
 
             $IP = $AssignedIPs | % {
                 $AllIPs = [System.Collections.ArrayList]@()

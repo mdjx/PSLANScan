@@ -38,11 +38,14 @@
     https://github.com/mdjx/PSLANScan
 #>
 function Find-LANHosts {
-    [Cmdletbinding()]
+    [Cmdletbinding(DefaultParameterSetName = "IPBlock")]
 
     Param (
-        [Parameter(Mandatory = $false, ValueFromPipeline, Position = 1)]
-        [string[]]$IP,
+        [Parameter(Mandatory = $false, ValueFromPipeline, ParameterSetName = "IPBlock")]
+        [string[]]$IP = $null,
+
+        [Parameter(Mandatory = $false, ValueFromPipeline, ParameterSetName = "Interface")]
+        [CimInstance[]]$NetAdapter = $null,
 
         [Parameter(Mandatory = $false, Position = 2)]
         [ValidateRange(0, 15000)]
@@ -53,66 +56,8 @@ function Find-LANHosts {
 
     Begin {
 
-        # Determine local network if none specified
-        if ($IP.Count -lt 1) {
-            $AssignedIPs = Get-NetAdapter -Physical | ? {$_.Status -eq "up"} | Get-NetIPAddress -AddressFamily IPv4 | Select IPAddress, PrefixLength
-
-            $IP = $AssignedIPs | % {
-                $AllIPs = [System.Collections.ArrayList]@()
-
-                [IPAddress]$SubnetMask = ([Math]::Pow(2, $_.PrefixLength) - 1) * [Math]::Pow(2, (32 - $_.PrefixLength))
-                $FullMask = [UInt32]'0xffffffff'
-                $NetworkId = [IPAddress](([IPAddress]$_.IPAddress).Address -band $SubnetMask.Address)
-                $Broadcast = [IPAddress](($FullMask - $NetworkId.Address) -bxor $SubnetMask.Address)
-
-                # Used for determining first usable IP Address
-                $FirstIPByteArray = $NetworkId.GetAddressBytes()
-                [Array]::Reverse($FirstIPByteArray)
-
-                # Used for determining last usable IP Address
-                $LastIPByteArray = $Broadcast.GetAddressBytes()
-                [Array]::Reverse($LastIPByteArray)
-
-                # Handler for /31, /30 CIDR prefix values, and default for all others.  
-                switch ($PrefixLength) {
-                    31 {
-                        $FirstIPInt = ([IPAddress]$FirstIPByteArray).Address
-                        $LastIPInt = ([IPAddress]$LastIPByteArray).Address
-                        break;
-                    }
-
-                    32 {
-                        $FirstIPInt = ([IPAddress]$FirstIPByteArray).Address
-                        $LastIPInt = ([IPAddress]$LastIPByteArray).Address
-                        break;
-                    }
-
-                    default {
-
-                        # First usable IP
-                        $FirstIPInt = ([IPAddress]$FirstIPByteArray).Address + 1
-                        $LastIPInt = ([IPAddress]$LastIPByteArray).Address - 1
-                    }
-                }
-
-                $CurrentIPInt = $FirstIPInt
-
-                Do {
-                    $CurrIP = [IPAddress]$CurrentIPInt
-                    $CurrIP = ($CurrIP).GetAddressBytes()
-                    [Array]::Reverse($CurrIP)
-                    $CurrIP = ([IPAddress]$CurrIP).IPAddressToString
-                    [void]$AllIPs.Add($CurrIP)
-        
-                    $CurrentIPInt++
-        
-                } While ($CurrentIPInt -le $LastIPInt)
-                Write-Output $AllIPs
-            }
-        }
-
         $ASCIIEncoding = New-Object System.Text.ASCIIEncoding
-        $Bytes = $ASCIIEncoding.GetBytes("a")
+        $Bytes = $ASCIIEncoding.GetBytes("!")
         $UDP = New-Object System.Net.Sockets.Udpclient
 
         if ($ClearARPCache) {
@@ -124,9 +69,21 @@ function Find-LANHosts {
 
         $IPList = [System.Collections.ArrayList]@()
         $Timer = [System.Diagnostics.Stopwatch]::StartNew()
+        Write-Verbose "Beginning scan"
     }
 
     Process {
+
+        if (($null -eq $IP) -and ($null -eq $NetAdapter)) {
+            if ($VerbosePreference -eq "SilentlyContinue") { $IP = Get-LANIPs }
+            else { $IP = Get-LANIPs -Verbose }
+        }
+
+        if ($PsCmdlet.ParameterSetName -eq "Interface") {
+            if ($VerbosePreference -eq "SilentlyContinue") { $IP = Get-LANIPs -NetAdapter $NetAdapter }
+            else { $IP = Get-LANIPs -NetAdapter $NetAdapter -Verbose }
+        }
+        
         $IP | ForEach-Object {
             $UDP.Connect($_, 1)
             [void]$UDP.Send($Bytes, $Bytes.length)

@@ -1,4 +1,5 @@
 BeforeAll { 
+    . "$PSScriptRoot\..\src\Get-LANIPs.ps1"
     . "$PSScriptRoot\..\src\Find-LANHosts.ps1"
 
     $AssumedNetworkId = (Get-NetRoute -DestinationPrefix '0.0.0.0/0').NextHop.Split(".")[0..2] -join "."

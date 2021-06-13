@@ -10,7 +10,12 @@
 
     .PARAMETER IP
     Optional. Specifies one or more IP addresses to scan for. Typically this will be a list of all usable hosts on a network. 
-    If omitted, it will enumerate local adapters and determine host IPs automatically, but may require elevated priviliges.
+
+    .PARAMETER NetAdapter
+    Optional. Specifies one or more NetAdaper (CimInstance) objects from Get-NetAdapter. These interfaces will have attached subnets detected and used for the scan.
+
+    If both the IP and NetAdapter parameters are omitted, all network adapters will be enumerated and local subnets automatically determined. This may require elevated priviliges. 
+    Please note that this can include adapters with very high host counts (/16, etc) which will take considerable time to enumerate.
 
     .PARAMETER DelayMS
     Optional. Specifies the interpacket delay, default is 2ms. Can be increased if scanning unreliable or high latency networks. 
@@ -22,11 +27,20 @@
     Find-LANHosts
 
     .EXAMPLE
-    $IPs = 1..254 | % {"10.250.1.$_"}
-    Find-LANHosts -IP $IPs
+    Find-LANHosts -ClearARPCache -DelayMS 5
 
     .EXAMPLE
-    Find-LANHosts -ClearARPCache -DelayMS 5
+    Get-NetAdapter -Name Ethernet | Find-LANHosts
+
+    .EXAMPLE
+    Get-NetAdapter | ? {($_ | Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue) -ne $null} | Find-LANHosts
+
+    .EXAMPLE
+    Get-NetRoute -DestinationPrefix 0.0.0.0/0 | Get-NetAdapter | Find-LANHosts
+
+    .EXAMPLE
+    $IPs = 1..254 | % {"10.250.1.$_"}
+    Find-LANHosts -IP $IPs
 
     .EXAMPLE
     1..254 | % {"192.168.1.$_"} | Find-LANHosts -ClearARPCache
@@ -75,21 +89,46 @@ function Find-LANHosts {
     Process {
 
         if (($null -eq $IP) -and ($null -eq $NetAdapter)) {
-            if ($VerbosePreference -eq "SilentlyContinue") { $IP = Get-LANIPs }
-            else { $IP = Get-LANIPs -Verbose }
+            if ($VerbosePreference -eq "SilentlyContinue") { [array]$IP = Get-IPs -ReturnIntRange }
+            else {[array]$IP = Get-IPs -ReturnIntRange -Verbose }
         }
 
         if ($PsCmdlet.ParameterSetName -eq "Interface") {
-            if ($VerbosePreference -eq "SilentlyContinue") { $IP = Get-LANIPs -NetAdapter $NetAdapter }
-            else { $IP = Get-LANIPs -NetAdapter $NetAdapter -Verbose }
+            if ($VerbosePreference -eq "SilentlyContinue") {[array]$IP = Get-IPs -NetAdapter $NetAdapter -ReturnIntRange }
+            else { [array]$IP = Get-IPs -NetAdapter $NetAdapter -ReturnIntRange -Verbose }
         }
-        
-        $IP | ForEach-Object {
-            $UDP.Connect($_, 1)
-            [void]$UDP.Send($Bytes, $Bytes.length)
-            [void]$IPList.Add($_)
-            if ($DelayMS) {
-                [System.Threading.Thread]::Sleep($DelayMS)
+
+        if ($IP.Count -lt 1) {
+            Write-Error "IP Count is less than 1, please check provided IPs or Adapter for valid address space"
+        }
+
+        if ($null -ne $IP.FirstIPInt) {
+            $IP | ForEach-Object {
+                $CurrentIPInt = $_.FirstIPInt
+                Do {
+                    $CurrIP = [IPAddress]$CurrentIPInt
+                    $CurrIP = ($CurrIP).GetAddressBytes()
+                    [Array]::Reverse($CurrIP)
+                    $CurrIP = ([IPAddress]$CurrIP).IPAddressToString
+                    $UDP.Connect($CurrIP, 1)
+                    [void]$UDP.Send($Bytes, $Bytes.length)
+                    [void]$IPList.Add($CurrIP)
+                    if ($DelayMS) {
+                        [System.Threading.Thread]::Sleep($DelayMS)
+                    }
+
+                    $CurrentIPInt++
+                } While ($CurrentIPInt -le $_.LastIPInt)
+            }
+        }
+        else {
+            $IP | ForEach-Object {
+                $UDP.Connect($_, 1)
+                [void]$UDP.Send($Bytes, $Bytes.length)
+                [void]$IPList.Add($_)
+                if ($DelayMS) {
+                    [System.Threading.Thread]::Sleep($DelayMS)
+                }
             }
         }
     }

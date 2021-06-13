@@ -26,7 +26,7 @@ Copy the files from `src` to `$Home\Documents\WindowsPowerShell\Modules\PSLANSca
 
 ## Usage
 
-`Find-LANHosts [-IP <String[]>] [-DelayMS <int>] [-ClearARPCache]`
+`Find-LANHosts [-IP <String[]>] [-NetAdapter <CimInstance[]>] [-DelayMS <int>] [-ClearARPCache]`
 
 ## Examples
 

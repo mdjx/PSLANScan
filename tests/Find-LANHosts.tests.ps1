@@ -1,5 +1,5 @@
 BeforeAll { 
-    . "$PSScriptRoot\..\src\Get-LANIPs.ps1"
+    . "$PSScriptRoot\..\src\Get-IPs.ps1"
     . "$PSScriptRoot\..\src\Find-LANHosts.ps1"
 
     $AssumedNetworkId = (Get-NetRoute -DestinationPrefix '0.0.0.0/0').NextHop.Split(".")[0..2] -join "."
@@ -24,15 +24,22 @@ Describe 'Tests' {
             $LANHosts.MACAddress | Should -BeGreaterThan 0
         }
 
-        It 'Validates Pipeline Input' {
+        It 'Validates IP Address List Pipeline Input' {
             $LANHosts = $IPs | Find-LANHosts
             $LANHosts.count | Should -BeGreaterThan 0
             $LANHosts.IP | Should -BeGreaterThan 0
             $LANHosts.MACAddress | Should -BeGreaterThan 0
         }
 
-        It 'Validates Pipeline Input #2' {        
+        It 'Validates IP Address List Pipeline Input #2' {        
             $LANHosts = 1..254 | % {"$AssumedNetworkId.$_"} | Find-LANHosts -DelayMS 5
+            $LANHosts.count | Should -BeGreaterThan 0
+            $LANHosts.IP | Should -BeGreaterThan 0
+            $LANHosts.MACAddress | Should -BeGreaterThan 0
+        }
+
+        It 'Validates NetAdapater Pipeline Input' {        
+            $LANHosts = Get-NetAdapter | Get-NetIPAddress -AddressFamily IPv4 -ErrorAction SilentlyContinue | ? PrefixLength -ge 24 | select -First 1 | Find-LANHosts
             $LANHosts.count | Should -BeGreaterThan 0
             $LANHosts.IP | Should -BeGreaterThan 0
             $LANHosts.MACAddress | Should -BeGreaterThan 0
